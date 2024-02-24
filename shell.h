@@ -128,8 +128,8 @@ SHELL_FUNCTION_DECL(quit, {});
 ShellToken shell_lex_token(char*, size_t);
 int shell_lex_expression(char*, size_t, ShellToken[EXPRESSION_MAX_TOKENS]);
 int shell_parse_expression(ShellToken[EXPRESSION_MAX_TOKENS], size_t, ShellCommand*);
-pid_t shell_execute_command(ShellCommand, int[2]);
-pid_t shell_interpret_expression(char*, size_t, int[2]);
+pid_t shell_execute_command(ShellCommand);
+pid_t shell_interpret_expression(char*, size_t);
 
 // *** terminal ***
 #define SHELL_TERMINAL_UI " ~> "
@@ -140,7 +140,7 @@ extern int shell_terminal_should_close;
 void shell_terminal_clear_expression();
 void shell_terminal_print_expression();
 void shell_terminal_close();
-void shell_terminal_init();
+int shell_terminal_init(int);
 void shell_terminal_update();
 int shell_rc(char*, size_t);
 int shell_rc_from_file(const char*);

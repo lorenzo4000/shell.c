@@ -245,39 +245,11 @@ int shell_parse_expression(ShellToken tokens[EXPRESSION_MAX_TOKENS], size_t n, S
 	return -1;
 }
 
-pid_t shell_execute_call(ShellCommand cmd, int pipes[2]) {
+int shell_execute_call(ShellCommand cmd) {
 	assert(cmd.type == COMMAND_CALL);
 
-    pid_t command_pid;
-
-	if (pipe(pipes) < 0) {
-		perror("pipe");
-		return -1;
-	}
-
-    if ((command_pid = fork()) < 0) {
-        perror("fork");
-        exit(EXIT_FAILURE);
-    }
-
-    if (command_pid == 0) { 
-
-        dup2(pipes[1], 1);   // redirect stdout to out[1]
-        dup2(pipes[1], 2);   // redirect stderr to err[1] 
-
-		// child
-		close(pipes[1]);
-        close(pipes[0]);
-
-		setbuf(stdout, NULL);
-		setbuf(stderr, NULL);
-
-		cmd.decl->action(cmd.args);
-		exit(0);
-    } 
-
-	close(pipes[1]);
-	return command_pid;
+	cmd.decl->action(cmd.args);
+	return 0;
 }
 
 int shell_execute_set(ShellCommand cmd) {
@@ -287,12 +259,12 @@ int shell_execute_set(ShellCommand cmd) {
 	return -1;
 }
 
-pid_t shell_execute_command(ShellCommand cmd, int pipes[2]) {
-	return cmd.type == COMMAND_CALL ? shell_execute_call(cmd, pipes) :
+pid_t shell_execute_command(ShellCommand cmd) {
+	return cmd.type == COMMAND_CALL ? shell_execute_call(cmd) :
 		   cmd.type == COMMAND_SET  ?  shell_execute_set(cmd)        : -1;
 }
 
-pid_t shell_interpret_expression(char* expression, size_t expression_len, int pipes[2]) {
+pid_t shell_interpret_expression(char* expression, size_t expression_len) {
 	ShellToken tokens[EXPRESSION_MAX_TOKENS];
 	ShellCommand cmd = {0};
 
@@ -311,7 +283,7 @@ pid_t shell_interpret_expression(char* expression, size_t expression_len, int pi
 		return -2;
 	}
 
-	return shell_execute_command(cmd, pipes);
+	return shell_execute_command(cmd);
 }
 
 static char shell_terminal_current_expression[MAX_EXPRESSION_LENGTH];
@@ -332,50 +304,44 @@ void shell_terminal_close() {
 }
 
 SHELL_FUNCTION_DEF(quit, {}, "quit") {
-	if(stdscr) {
-		// we assume we are a terminal child process, so send SIGTERM up
-        kill(getppid(), SIGTERM);
-	}
+	shell_terminal_close();
 }
 
-void shell_terminal_init() {
-    initscr();
-    raw();
-	noecho();
-	scrollok(stdscr, TRUE);
-    keypad(stdscr, TRUE);
-	assert(def_prog_mode() == OK);
+int shell_terminal_init(int command_out_fd) {
+	// Redirect stdout to command_out_fd
+    if (dup2(command_out_fd, STDOUT_FILENO) == -1) {
+        perror("dup2");
+        close(command_out_fd);
+        return -1;
+    }
+
+	FILE *f = fopen("/dev/tty", "r+");
+	SCREEN *screen = newterm(NULL, f, f);
+	set_term(screen);
+
+   	raw();
+   	noecho();
+   	scrollok(stdscr, TRUE);
+   	keypad(stdscr, TRUE);
 	
 	addch('\r');
 	shell_terminal_print_line();
 	refresh();
 
-    signal(SIGTERM, shell_terminal_close);
+	return 0;
 }
 
 void shell_terminal_interpret_expression_and_print_output() {
-	assert(reset_shell_mode() == OK); {
+	// assert(reset_shell_mode() == OK); {
 		addch('\n');
 
-		int pipes[2];
-		pid_t command_pid = shell_interpret_expression(
+		 shell_interpret_expression(
 			shell_terminal_current_expression, 
-			strlen(shell_terminal_current_expression), 
-			pipes
+			strlen(shell_terminal_current_expression)
 		);
 
-		if(command_pid >= 0) {
-			unsigned char b;
-			while (read(pipes[0], &b, 1) > 0) {
-				addch(b);
-			}
-
-			close(pipes[0]);
-			waitpid(command_pid, NULL, 0);
-		}
-
 		refresh();
-	}; assert(reset_prog_mode() == OK);
+	// }; assert(reset_prog_mode() == OK);
 }
 
 void shell_terminal_update() {
