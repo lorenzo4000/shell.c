@@ -1,14 +1,9 @@
 #include <shell.h>
 
 #include <assert.h>
-#include <ncurses.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <signal.h>
-#include <stdio.h>
 
 extern ShellScopeEntry _shell_scope__[];
 extern size_t _shell_scope_size__;
@@ -465,4 +460,40 @@ int shell_rc_from_file(const char* filename) {
 	int ret = shell_rc(buffer, length);
 	free(buffer);
 	return ret;
+}
+
+#define PAGE_STACK_SIZE 16
+static PANEL* page_stack[PAGE_STACK_SIZE];
+static unsigned int page_stack_top;
+int shell_terminal_page_push() {
+	if(page_stack_top >= PAGE_STACK_SIZE) {
+		return -1;
+	}
+	
+	WINDOW* new_win = newwin(0, 0, 0, 0);
+	PANEL* panel = new_panel(new_win);
+		
+	page_stack[page_stack_top++] = panel;
+	top_panel(panel);
+
+	update_panels();
+	doupdate();
+	return 0;
+}
+
+int shell_terminal_page_pop() {
+	if(page_stack_top <= 0) {
+		return -1;
+	}
+	
+	PANEL* panel = page_stack[--page_stack_top];
+	hide_panel(panel);
+
+	if(page_stack_top >= 1) {
+		top_panel(page_stack[page_stack_top]);
+	}
+
+	update_panels();
+	doupdate();
+	return 0;
 }

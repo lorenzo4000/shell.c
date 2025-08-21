@@ -1,6 +1,9 @@
 #ifndef SS_SHELL_H
 #define SS_SHELL_H
 
+#include <ncurses.h>
+#include <panel.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
@@ -142,9 +145,14 @@ void shell_terminal_print_expression();
 void shell_terminal_close();
 int shell_terminal_init(int);
 void shell_terminal_update();
+int shell_terminal_page_push();
+int shell_terminal_page_pop();
+
+#define shell_terminal_printf printw
+
+
 int shell_rc(char*, size_t);
 int shell_rc_from_file(const char*);
-
 
 
 #endif // SS_SHELL_H
